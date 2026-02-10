@@ -34,7 +34,6 @@
 package com.virgilsecurity.keyknox.cloud
 
 import com.virgilsecurity.keyknox.KeyknoxManager
-import com.virgilsecurity.keyknox.TestConfig
 import com.virgilsecurity.keyknox.client.KeyknoxClient
 import com.virgilsecurity.keyknox.crypto.KeyknoxCrypto
 import com.virgilsecurity.keyknox.crypto.KeyknoxCryptoProtocol
@@ -42,6 +41,7 @@ import com.virgilsecurity.keyknox.exception.CloudKeyStorageException
 import com.virgilsecurity.keyknox.exception.CloudStorageOutOfSyncException
 import com.virgilsecurity.keyknox.exception.EntryNotFoundException
 import com.virgilsecurity.sdk.common.TimeSpan
+import com.virgilsecurity.sdk.common.PropertyManager
 import com.virgilsecurity.sdk.crypto.*
 import com.virgilsecurity.sdk.jwt.JwtGenerator
 import com.virgilsecurity.sdk.jwt.accessProviders.CachingJwtProvider
@@ -50,6 +50,7 @@ import com.virgilsecurity.sdk.storage.KeyEntry
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -65,22 +66,30 @@ class CloudKeyStorageTest {
     private lateinit var keyknoxManager: KeyknoxManager
     private lateinit var provider: CachingJwtProvider
     private lateinit var keyStorage: CloudKeyStorageProtocol
+    private lateinit var propertyManager: PropertyManager
 
     @BeforeEach
     fun setup() {
         this.virgilCrypto = VirgilCrypto(false)
         this.keyknoxCrypto = KeyknoxCrypto()
+        this.propertyManager = PropertyManager()
 
         val keyPair = this.virgilCrypto.generateKeyPair(KeyPairType.ED25519)
         this.privateKey = keyPair.privateKey
         this.publicKey = keyPair.publicKey
         this.publicKeys = arrayListOf(this.publicKey)
 
-        val jwtGenerator = JwtGenerator(TestConfig.appId, TestConfig.appPrivateKey, TestConfig.appPublicKeyId, TimeSpan.fromTime(600, TimeUnit.SECONDS),
+
+        val jwtGenerator = JwtGenerator(this.propertyManager.getAppId(), this.propertyManager.getAppPrivateKey(), this.propertyManager.getAppPublicKeyId(), TimeSpan.fromTime(600, TimeUnit.SECONDS),
                 VirgilAccessTokenSigner(this.virgilCrypto))
         this.provider = CachingJwtProvider(CachingJwtProvider.RenewJwtCallback { jwtGenerator.generateToken(identity) })
 
-        this.keyknoxClient = KeyknoxClient(this.provider)
+        val serviceBaseUrl = this.propertyManager.getServiceBaseUrl()
+        this.keyknoxClient = if (serviceBaseUrl.isNullOrBlank()) {
+            KeyknoxClient(this.provider)
+        } else {
+            KeyknoxClient(this.provider, URL(serviceBaseUrl))
+        }
         this.keyknoxManager = KeyknoxManager(this.keyknoxClient, this.keyknoxCrypto)
 
         this.keyStorage = CloudKeyStorage(this.keyknoxManager, this.publicKeys, this.privateKey)

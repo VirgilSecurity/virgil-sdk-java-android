@@ -37,9 +37,9 @@ import com.virgilsecurity.crypto.foundation.Aes256Gcm
 import com.virgilsecurity.crypto.foundation.RecipientCipher
 import com.virgilsecurity.crypto.foundation.Sha512
 import com.virgilsecurity.crypto.foundation.Signer
-import com.virgilsecurity.keyknox.TestConfig
 import com.virgilsecurity.keyknox.utils.base64Encode
 import com.virgilsecurity.sdk.common.TimeSpan
+import com.virgilsecurity.sdk.common.PropertyManager
 import com.virgilsecurity.sdk.crypto.*
 import com.virgilsecurity.sdk.jwt.JwtGenerator
 import com.virgilsecurity.sdk.jwt.accessProviders.CachingJwtProvider
@@ -60,6 +60,7 @@ class KeyknoxClientTest {
     private lateinit var keyknoxClient: KeyknoxClientProtocol
     private lateinit var publicKey: VirgilPublicKey
     private lateinit var privateKey: VirgilPrivateKey
+    private lateinit var propertyManager: PropertyManager
 
     @BeforeEach
     fun setup() {
@@ -70,12 +71,12 @@ class KeyknoxClientTest {
         val keyPair = this.virgilCrypto.generateKeyPair(KeyPairType.ED25519)
         this.privateKey = keyPair.privateKey
         this.publicKey = keyPair.publicKey
+        this.propertyManager = PropertyManager()
 
-
-        val jwtGenerator = JwtGenerator(TestConfig.appId, TestConfig.appPrivateKey, TestConfig.appPublicKeyId, TimeSpan.fromTime(600, TimeUnit.SECONDS),
+        val jwtGenerator = JwtGenerator(this.propertyManager.getAppId(), this.propertyManager.getAppPrivateKey(), this.propertyManager.getAppPublicKeyId(), TimeSpan.fromTime(600, TimeUnit.SECONDS),
                 VirgilAccessTokenSigner(this.virgilCrypto))
         val tokenProvider = CachingJwtProvider(CachingJwtProvider.RenewJwtCallback { jwtGenerator.generateToken(identity) })
-        this.keyknoxClient = KeyknoxClient(tokenProvider, URL(TestConfig.keyknoxServiceAddress))
+        this.keyknoxClient = KeyknoxClient(tokenProvider, URL(this.propertyManager.getServiceBaseUrl()))
     }
 
     @Test

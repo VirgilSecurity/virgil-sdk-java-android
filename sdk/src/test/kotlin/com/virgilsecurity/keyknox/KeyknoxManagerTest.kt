@@ -42,12 +42,14 @@ import com.virgilsecurity.keyknox.exception.SignerNotFoundException
 import com.virgilsecurity.keyknox.utils.base64Encode
 import com.virgilsecurity.keyknox.utils.random
 import com.virgilsecurity.sdk.common.TimeSpan
+import com.virgilsecurity.sdk.common.PropertyManager
 import com.virgilsecurity.sdk.crypto.*
 import com.virgilsecurity.sdk.jwt.JwtGenerator
 import com.virgilsecurity.sdk.jwt.accessProviders.CachingJwtProvider
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -66,6 +68,7 @@ class KeyknoxManagerTest {
     private lateinit var keyknoxClient: KeyknoxClient
     private lateinit var keyknoxManager: KeyknoxManager
     private lateinit var provider: CachingJwtProvider
+    private lateinit var propertyManager: PropertyManager
 
     @BeforeEach
     fun setup() {
@@ -75,13 +78,19 @@ class KeyknoxManagerTest {
         this.privateKey = keyPair.privateKey
         this.publicKey = keyPair.publicKey
         this.publicKeys = arrayListOf(this.publicKey)
+        this.propertyManager = PropertyManager()
 
 
-        val jwtGenerator = JwtGenerator(TestConfig.appId, TestConfig.appPrivateKey, TestConfig.appPublicKeyId, TimeSpan.fromTime(600, TimeUnit.SECONDS),
+        val jwtGenerator = JwtGenerator(this.propertyManager.getAppId(), this.propertyManager.getAppPrivateKey(), this.propertyManager.getAppPublicKeyId(), TimeSpan.fromTime(600, TimeUnit.SECONDS),
                 VirgilAccessTokenSigner(this.virgilCrypto))
         this.provider = CachingJwtProvider(CachingJwtProvider.RenewJwtCallback { jwtGenerator.generateToken(identity) })
 
-        this.keyknoxClient = KeyknoxClient(this.provider)
+        val serviceBaseUrl = this.propertyManager.getServiceBaseUrl()
+        this.keyknoxClient = if (serviceBaseUrl.isNullOrBlank()) {
+            KeyknoxClient(this.provider)
+        } else {
+            KeyknoxClient(this.provider, URL(serviceBaseUrl))
+        }
         this.keyknoxManager = KeyknoxManager(this.keyknoxClient, this.keyknoxCrypto)
     }
 

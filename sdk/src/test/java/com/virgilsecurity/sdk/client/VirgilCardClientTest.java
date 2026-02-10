@@ -67,7 +67,7 @@ public class VirgilCardClientTest extends PropertyManager {
 
   @BeforeEach
   public void setUp() {
-    String url = getCardsServiceUrl();
+    String url = getServiceBaseUrl();
     if (StringUtils.isBlank(url)) {
       cardClient = new VirgilCardClient();
     } else {
@@ -184,9 +184,8 @@ public class VirgilCardClientTest extends PropertyManager {
     RawSignedModel cardModelBeforePublish = mocker.generateCardModel(identity);
     assertNotNull(cardModelBeforePublish);
 
-    RawSignedModel cardModelAfterPublish =
-        cardClient.publishCard(cardModelBeforePublish,
-            mocker.generateAccessToken(identity).stringRepresentation());
+    RawSignedModel cardModelAfterPublish = cardClient.publishCard(cardModelBeforePublish,
+        mocker.generateAccessToken(identity).stringRepresentation());
     assertNotNull(cardModelAfterPublish);
     TestUtils.assertCardModelsEquals(cardModelBeforePublish, cardModelAfterPublish);
 
@@ -196,15 +195,13 @@ public class VirgilCardClientTest extends PropertyManager {
     cardClient.revokeCard(publishedCard.getIdentifier(),
         mocker.generateAccessToken(identity).stringRepresentation());
 
-    Tuple<RawSignedModel, Boolean> revokedTuple =
-        cardClient.getCard(publishedCard.getIdentifier(),
-            mocker.generateAccessToken(identity).stringRepresentation());
+    Tuple<RawSignedModel, Boolean> revokedTuple = cardClient.getCard(publishedCard.getIdentifier(),
+        mocker.generateAccessToken(identity).stringRepresentation());
 
     assertTrue(revokedTuple.getRight());
 
-    List<RawSignedModel> searchedModels =
-        cardClient.searchCards(identity,
-            mocker.generateAccessToken(identity).stringRepresentation());
+    List<RawSignedModel> searchedModels = cardClient.searchCards(identity,
+        mocker.generateAccessToken(identity).stringRepresentation());
     assertEquals(searchedModels.size(), 0);
   }
 }

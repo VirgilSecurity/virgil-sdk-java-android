@@ -33,22 +33,27 @@
 
 package com.virgilsecurity.sdk.common;
 
+import com.virgilsecurity.sdk.crypto.HashAlgorithm;
 import com.virgilsecurity.sdk.crypto.VirgilCrypto;
 import com.virgilsecurity.sdk.crypto.VirgilPrivateKey;
 import com.virgilsecurity.sdk.crypto.VirgilPublicKey;
 import com.virgilsecurity.sdk.crypto.exceptions.CryptoException;
 import com.virgilsecurity.sdk.utils.ConvertionUtils;
+import com.virgilsecurity.common.util.HexUtils;
 import com.virgilsecurity.testcommon.property.EnvPropertyReader;
 import com.virgilsecurity.testcommon.utils.PropertyUtils;
+
+import org.opentest4j.TestAbortedException;
+
+import java.io.File;
+import java.security.PublicKey;
 
 public class PropertyManager {
 
   private static final String ENVIRONMENT_SYS_VAR = "environment";
   private static final String APP_ID = "APP_ID";
-  private static final String APP_PRIVATE_KEY = "APP_PRIVATE_KEY";
-  private static final String APP_PUBLIC_KEY = "APP_PUBLIC_KEY";
-  private static final String APP_PUBLIC_KEY_ID = "APP_PUBLIC_KEY_ID";
-  private static final String CARDS_SERVICE_ADDRESS = "CARDS_SERVICE_ADDRESS";
+  private static final String APP_PRIVATE_KEY = "APP_KEY";
+  private static final String BASE_SERVICE_URL = "BASE_SERVICE_URL";
 
   private final EnvPropertyReader propertyReader;
   private final VirgilCrypto crypto;
@@ -57,17 +62,24 @@ public class PropertyManager {
    * Create new instance of {@link PropertyManager}.
    */
   public PropertyManager() {
+    File expectedEnvFile = new File(new File(System.getProperty("user.dir")).getParentFile(), "env.json");
+    if (!expectedEnvFile.exists()) {
+      throw new TestAbortedException(
+          "Missing " + expectedEnvFile.getAbsolutePath() + ". "
+              + "Cards-service integration tests are skipped.");
+    }
+
     String environment = PropertyUtils.getSystemProperty(ENVIRONMENT_SYS_VAR);
 
     if (environment != null) {
       this.propertyReader = new EnvPropertyReader.Builder()
-              .environment(EnvPropertyReader.Environment.fromType(environment))
-              .isDefaultSubmodule(true)
-              .build();
+          .environment(EnvPropertyReader.Environment.fromType(environment))
+          .isDefaultSubmodule(true)
+          .build();
     } else {
       this.propertyReader = new EnvPropertyReader.Builder()
-              .isDefaultSubmodule(true)
-              .build();
+          .isDefaultSubmodule(true)
+          .build();
     }
 
     this.crypto = new VirgilCrypto();
@@ -87,20 +99,41 @@ public class PropertyManager {
   }
 
   public VirgilPublicKey getAppPublicKey() {
-    String publicKeyString = propertyReader.getProperty(APP_PUBLIC_KEY);
-
+    String privateKeyString = propertyReader.getProperty(APP_PRIVATE_KEY);
     try {
-      return crypto.importPublicKey(ConvertionUtils.base64ToBytes(publicKeyString));
+      return crypto.importPrivateKey(ConvertionUtils.base64ToBytes(privateKeyString)).getPublicKey();
     } catch (CryptoException e) {
       throw new IllegalStateException(e);
     }
   }
 
   public String getAppPublicKeyId() {
-    return propertyReader.getProperty(APP_PUBLIC_KEY_ID);
+    String privateKeyString = propertyReader.getProperty(APP_PRIVATE_KEY);
+    try {
+
+      VirgilPublicKey publicKey = crypto.importPrivateKey(ConvertionUtils.base64ToBytes(privateKeyString))
+          .getPublicKey();
+      byte[] publicKeyBase64Bytes = ConvertionUtils.toBase64Bytes(crypto.exportPublicKey(publicKey));
+      byte[] publicKeyHash = crypto.computeHash(publicKeyBase64Bytes, HashAlgorithm.SHA512);
+      String keyId = ConvertionUtils.toHex(publicKeyHash).substring(0, 32).toLowerCase();
+      return keyId;
+
+    } catch (CryptoException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
-  public String getCardsServiceUrl() {
-    return propertyReader.getProperty(CARDS_SERVICE_ADDRESS);
+  public String getServiceBaseUrl() {
+    return getOptionalProperty(BASE_SERVICE_URL);
   }
+
+  private String getOptionalProperty(String name) {
+    try {
+      return propertyReader.getProperty(name);
+    } catch (RuntimeException e) {
+      // EnvPropertyReader throws when property is absent.
+      return null;
+    }
+  }
+
 }

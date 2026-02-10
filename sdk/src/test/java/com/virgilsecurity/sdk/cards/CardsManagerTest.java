@@ -60,7 +60,6 @@ import com.virgilsecurity.sdk.utils.ConvertionUtils;
 import com.virgilsecurity.sdk.utils.StringUtils;
 import com.virgilsecurity.sdk.utils.TestUtils;
 import com.virgilsecurity.sdk.utils.Tuple;
-import com.virgilsecurity.testcommon.utils.PropertyUtils;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,7 +89,6 @@ import static org.mockito.Mockito.when;
 public class CardsManagerTest extends PropertyManager {
 
   private static final String SIGNER_TYPE_EXTRA = "bestsignerever";
-  private static final String CARDS_SERVICE_PUBLIC_KEY = "bestsignerever";
 
   private Mocker mocker;
   private VirgilCrypto crypto;
@@ -105,16 +103,13 @@ public class CardsManagerTest extends PropertyManager {
     mocker = new Mocker();
     crypto = new VirgilCrypto();
     cardCrypto = new VirgilCardCrypto();
-    String url = getCardsServiceUrl();
+    String url = getServiceBaseUrl();
     if (StringUtils.isBlank(url)) {
       cardClient = new VirgilCardClient();
     } else {
       cardClient = new VirgilCardClient(url);
     }
     cardVerifier = new VirgilCardVerifier(cardCrypto);
-    if (!StringUtils.isBlank(PropertyUtils.getSystemProperty(CARDS_SERVICE_PUBLIC_KEY))) {
-      cardVerifier.setServiceKey(PropertyUtils.getSystemProperty(CARDS_SERVICE_PUBLIC_KEY));
-    }
     dataProvider = new CompatibilityDataProvider();
   }
 
@@ -250,7 +245,8 @@ public class CardsManagerTest extends PropertyManager {
 
     // Call publishCard(privateKey2, publicKey2, Card1.identifier)
     Card publishedCard2 = cardManager.publishCard(cardModel2);
-    // Card2 is successfully created and matches card that was generated on the client side
+    // Card2 is successfully created and matches card that was generated on the
+    // client side
     assertNotNull(publishedCard2);
     assertFalse(publishedCard2.isOutdated());
     assertCardsEquals(generatedCard2, publishedCard2);
@@ -258,7 +254,8 @@ public class CardsManagerTest extends PropertyManager {
 
     // Get Card2 using getCard
     Card cardFromService2 = cardManager.getCard(generatedCard2.getIdentifier());
-    // Card2 is successfully retrieved and matches card that was generated on the client side
+    // Card2 is successfully retrieved and matches card that was generated on the
+    // client side
     // (including
     // previousCardId and isOutdated=false).
     assertNotNull(cardFromService2);
@@ -268,7 +265,8 @@ public class CardsManagerTest extends PropertyManager {
 
     // Get Card1 using getCard
     Card outdatedCard = cardManager.getCard(generatedCard1.getIdentifier());
-    // Card1 is successfully retrieved and matches card that was generated on the client side.
+    // Card1 is successfully retrieved and matches card that was generated on the
+    // client side.
     // (isOutdated=true)
     assertNotNull(outdatedCard);
     assertTrue(outdatedCard.isOutdated());
@@ -402,8 +400,8 @@ public class CardsManagerTest extends PropertyManager {
 
     RawCardContent cardContent = new RawCardContent(testIdentity,
         dataProvider.getJsonByKey(34, "public_key_base64"), new Date());
-    RawSignedModel rawSignedModelTwo =
-        new RawSignedModel(ConvertionUtils.base64ToBytes(cardContent.exportAsBase64String()));
+    RawSignedModel rawSignedModelTwo = new RawSignedModel(
+        ConvertionUtils.base64ToBytes(cardContent.exportAsBase64String()));
 
     ModelSigner signer = new ModelSigner(cardCrypto);
     VirgilPrivateKey privateKey = crypto.importPrivateKey(

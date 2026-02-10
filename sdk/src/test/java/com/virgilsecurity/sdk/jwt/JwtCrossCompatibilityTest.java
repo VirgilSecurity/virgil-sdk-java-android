@@ -53,6 +53,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
 
 import java.io.InputStreamReader;
+import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -202,8 +203,11 @@ public class JwtCrossCompatibilityTest {
     assertEquals(sampleJson.get("STC-29.jwt_signature_base64").getAsString(),
         ConvertionUtils.toBase64String(jwt.getSignatureData()));
 
-    // Call isExpired()
-    assertFalse(jwt.isExpired());
+    // Call isExpired(Date)
+    // (avoid relying on wall-clock time because STC-29.jwt eventually becomes expired)
+    long expiresAt = jwt.getBodyContent().getExpiresAt();
+    assertFalse(jwt.isExpired(new Date((expiresAt - 1) * 1000)), "Token should not be expired just before exp");
+    assertTrue(jwt.isExpired(new Date(expiresAt * 1000)), "Token should be expired at exp");
 
     // Call stringRepresentation()
     assertEquals(token, jwt.stringRepresentation());

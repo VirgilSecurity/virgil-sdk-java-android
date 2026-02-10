@@ -61,8 +61,8 @@ import java.util.logging.Logger;
 public class VirgilCardClient implements CardClient {
   private static final Logger LOGGER = Logger.getLogger(VirgilCardClient.class.getName());
 
-  private static final String BASE_URL = "https://api.virgilsecurity.com/card";
-  private static final String SERVICE_VERSION = "/v5/";
+  private static final String BASE_SERVICE_URL = "https://api.virgilsecurity.com";
+  private static final String CARDS_V5_PATH = "/card/v5/";
 
   private URL serviceUrl;
   private HttpClient httpClient;
@@ -71,7 +71,7 @@ public class VirgilCardClient implements CardClient {
    * Create a new instance of {@code CardClient} with default HttpClient.
    */
   public VirgilCardClient() {
-    this(BASE_URL + SERVICE_VERSION);
+    this(BASE_SERVICE_URL);
   }
 
   /**
@@ -80,7 +80,7 @@ public class VirgilCardClient implements CardClient {
    * @param httpClient http client that will be used for firing requests
    */
   public VirgilCardClient(HttpClient httpClient) {
-    this(BASE_URL + SERVICE_VERSION, httpClient);
+    this(BASE_SERVICE_URL, httpClient);
   }
 
   /**
@@ -88,13 +88,15 @@ public class VirgilCardClient implements CardClient {
    *
    * @param serviceUrl the service url to fire requests to
    */
-  public VirgilCardClient(String serviceUrl) {
+  public VirgilCardClient(String baseServiceUrl) {
     try {
-      this.serviceUrl = new URL(serviceUrl);
+      URL url = new URL(baseServiceUrl);
+      this.serviceUrl = new URL(url.getProtocol(), url.getHost(), url.getPort(), CARDS_V5_PATH);
+      httpClient = new HttpClient();
     } catch (MalformedURLException e) {
-      throw new IllegalArgumentException("CardClient -> 'serviceUrl' has wrong format");
+      LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
+      throw new IllegalArgumentException("Incorrect service URL", e);
     }
-    httpClient = new HttpClient();
   }
 
   /**
@@ -105,9 +107,11 @@ public class VirgilCardClient implements CardClient {
    */
   public VirgilCardClient(String serviceUrl, HttpClient httpClient) {
     try {
-      this.serviceUrl = new URL(serviceUrl);
+      URL url = new URL(serviceUrl);
+      this.serviceUrl = new URL(url.getProtocol(), url.getHost(), url.getPort(), CARDS_V5_PATH);
     } catch (MalformedURLException e) {
-      throw new IllegalArgumentException("CardClient -> 'serviceUrl' has wrong format");
+      LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
+      throw new IllegalArgumentException("Incorrect service URL", e);
     }
     this.httpClient = httpClient;
   }
@@ -117,8 +121,13 @@ public class VirgilCardClient implements CardClient {
    *
    * @param serviceUrl the service url to fire requests to
    */
-  public VirgilCardClient(URL serviceUrl) {
-    this.serviceUrl = serviceUrl;
+  public VirgilCardClient(URL baseServiceUrl) {
+    try {
+      this.serviceUrl = new URL(baseServiceUrl.getProtocol(), baseServiceUrl.getHost(), baseServiceUrl.getPort(), CARDS_V5_PATH);
+    } catch (MalformedURLException e) {
+      LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
+      throw new IllegalArgumentException("Incorrect service URL", e);
+    }
     httpClient = new HttpClient();
   }
 
@@ -129,7 +138,12 @@ public class VirgilCardClient implements CardClient {
    * @param httpClient http client that will be used for firing requests
    */
   public VirgilCardClient(URL serviceUrl, HttpClient httpClient) {
-    this.serviceUrl = serviceUrl;
+    try {
+      this.serviceUrl = new URL(serviceUrl.getProtocol(), serviceUrl.getHost(), serviceUrl.getPort(), CARDS_V5_PATH);
+    } catch (MalformedURLException e) {
+      LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
+      throw new IllegalArgumentException("Incorrect service URL", e);
+    }
     this.httpClient = httpClient;
   }
 

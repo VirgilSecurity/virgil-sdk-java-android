@@ -181,7 +181,8 @@ public class ConvertionUtils {
    *
    * @param serializedObject the string presentation of object serialized to JSON
    * @param objectType       the type of object
-   * @return the {@code objectType} object deserialized from {@code serializedObject}
+   * @return the {@code objectType} object deserialized from
+   *         {@code serializedObject}
    */
   public static <T> T deserializeFromJson(String serializedObject, Class<T> objectType) {
     return getGson().fromJson(serializedObject, objectType);
@@ -200,7 +201,8 @@ public class ConvertionUtils {
   }
 
   /**
-   * Get {@link Gson} which supports Virgil rules for date and byte array conversions.
+   * Get {@link Gson} which supports Virgil rules for date and byte array
+   * conversions.
    *
    * @return the Gson instance.
    */
@@ -243,9 +245,11 @@ public class ConvertionUtils {
   }
 
   /**
-   * Deserialize object of <code>objectType</code> type from binary presentation of JSON String.
+   * Deserialize object of <code>objectType</code> type from binary presentation
+   * of JSON String.
    *
-   * @param snapshot   the object snapshot which is a binary presentation of JSON string
+   * @param snapshot   the object snapshot which is a binary presentation of JSON
+   *                   string
    * @param objectType the type of object
    * @return the {@code objectType} object deserialized from {@code snapshot}
    */
@@ -270,6 +274,17 @@ public class ConvertionUtils {
    * @return the byte array.
    */
   public static byte[] toBase64Bytes(String value) {
+    String str = toBase64String(value);
+    return toBytes(str);
+  }
+
+  /**
+   * Convert byte array to Base64 byte array.
+   *
+   * @param value the byte array to be converted.
+   * @return the byte array.
+   */
+  public static byte[] toBase64Bytes(byte[] value) {
     String str = toBase64String(value);
     return toBytes(str);
   }
@@ -340,7 +355,8 @@ public class ConvertionUtils {
   }
 
   /**
-   * Decodes the current bytes to a string according to the specified character encoding.
+   * Decodes the current bytes to a string according to the specified character
+   * encoding.
    *
    * @param inputBytes bytes to decode
    * @param encoding   The character encoding to decode to.
@@ -369,7 +385,8 @@ public class ConvertionUtils {
   }
 
   /**
-   * Get the contents of an <code>InputStream</code> as a String using UTF-8 character encoding.
+   * Get the contents of an <code>InputStream</code> as a String using UTF-8
+   * character encoding.
    *
    * @param is the input stream.
    * @return the input stream data as string.

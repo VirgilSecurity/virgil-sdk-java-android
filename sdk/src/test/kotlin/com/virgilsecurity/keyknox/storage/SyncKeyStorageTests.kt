@@ -34,7 +34,6 @@
 package com.virgilsecurity.keyknox.storage
 
 import com.virgilsecurity.keyknox.KeyknoxManager
-import com.virgilsecurity.keyknox.TestConfig
 import com.virgilsecurity.keyknox.client.KeyknoxClient
 import com.virgilsecurity.keyknox.cloud.CloudKeyStorage
 import com.virgilsecurity.keyknox.cloud.CloudKeyStorageProtocol
@@ -44,6 +43,7 @@ import com.virgilsecurity.keyknox.exception.DecryptionFailedException
 import com.virgilsecurity.keyknox.exception.SignerNotFoundException
 import com.virgilsecurity.keyknox.model.CloudEntry
 import com.virgilsecurity.sdk.common.TimeSpan
+import com.virgilsecurity.sdk.common.PropertyManager
 import com.virgilsecurity.sdk.crypto.*
 import com.virgilsecurity.sdk.jwt.JwtGenerator
 import com.virgilsecurity.sdk.jwt.accessProviders.CachingJwtProvider
@@ -54,6 +54,7 @@ import com.virgilsecurity.sdk.utils.ConvertionUtils
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -68,6 +69,8 @@ class SyncKeyStorageTests {
     private lateinit var keyStorage: KeyStorage
     private lateinit var keychainStorageWrapper: KeyStorageWrapper
     private lateinit var syncKeyStorage: SyncKeyStorage
+    private lateinit var propertyManager: PropertyManager
+
 
     @BeforeEach
     fun setup() {
@@ -76,18 +79,24 @@ class SyncKeyStorageTests {
         val keyPair = this.virgilCrypto.generateKeyPair(KeyPairType.ED25519)
         this.privateKey = keyPair.privateKey
         this.publicKey = keyPair.publicKey
+        this.propertyManager = PropertyManager()
 
         val jwtGenerator = JwtGenerator(
-            TestConfig.appId,
-            TestConfig.appPrivateKey,
-            TestConfig.appPublicKeyId,
+            this.propertyManager.getAppId(),
+            this.propertyManager.getAppPrivateKey(),
+            this.propertyManager.getAppPublicKeyId(),
             TimeSpan.fromTime(100, TimeUnit.SECONDS),
             VirgilAccessTokenSigner(this.virgilCrypto)
         )
         val provider = CachingJwtProvider(CachingJwtProvider.RenewJwtCallback {
             jwtGenerator.generateToken(identity)
         })
-        val keyknoxClient = KeyknoxClient(provider)
+        val serviceBaseUrl = this.propertyManager.getServiceBaseUrl()
+        val keyknoxClient = if (serviceBaseUrl.isNullOrBlank()) {
+            KeyknoxClient(provider)
+        } else {
+            KeyknoxClient(provider, URL(serviceBaseUrl))
+        }
         this.keyknoxManager = KeyknoxManager(keyknoxClient)
 
         this.cloudKeyStorage =
@@ -109,9 +118,9 @@ class SyncKeyStorageTests {
     @Test
     fun init() {
         val jwtGenerator = JwtGenerator(
-            TestConfig.appId,
-            TestConfig.appPrivateKey,
-            TestConfig.appPublicKeyId,
+            this.propertyManager.getAppId(),
+            this.propertyManager.getAppPrivateKey(),
+            this.propertyManager.getAppPublicKeyId(),
             TimeSpan.fromTime(100, TimeUnit.SECONDS),
             VirgilAccessTokenSigner(this.virgilCrypto)
         )
@@ -129,13 +138,18 @@ class SyncKeyStorageTests {
         // Load private key from Keychain
         val privateKey = this.privateKey
 
-        val syncKeyStorage = SyncKeyStorage(
-            identity = "Alice",
-            accessTokenProvider = accessTokenProvider,
-            crypto = this.virgilCrypto,
+        val serviceBaseUrl = this.propertyManager.getServiceBaseUrl()
+        val keyknoxClient = if (serviceBaseUrl.isNullOrBlank()) {
+            KeyknoxClient(accessTokenProvider)
+        } else {
+            KeyknoxClient(accessTokenProvider, URL(serviceBaseUrl))
+        }
+        val cloudKeyStorage = CloudKeyStorage(
+            keyknoxManager = KeyknoxManager(keyknoxClient),
             publicKeys = publicKeys,
             privateKey = privateKey
         )
+        val syncKeyStorage = SyncKeyStorage(identity = "Alice", cloudKeyStorage = cloudKeyStorage)
 
         syncKeyStorage.sync()
         assertTrue(syncKeyStorage.retrieveAll().isEmpty())
@@ -331,7 +345,7 @@ class SyncKeyStorageTests {
         assertEquals(newPublicKeys.map { it.identifier }, pubIds)
         assertEquals(
             newPrivateKey.identifier,
-            (cloudKeyStorage.privateKey as VirgilPrivateKey).identifier
+            cloudKeyStorage.privateKey.identifier
         )
 
         val keychainEntry2 = this.syncKeyStorage.retrieve(name)
@@ -566,16 +580,21 @@ class SyncKeyStorageTests {
         val publicKey2 = keyPair2.publicKey
 
         val jwtGenerator = JwtGenerator(
-            TestConfig.appId,
-            TestConfig.appPrivateKey,
-            TestConfig.appPublicKeyId,
+            this.propertyManager.getAppId(),
+            this.propertyManager.getAppPrivateKey(),
+            this.propertyManager.getAppPublicKeyId(),
             TimeSpan.fromTime(100, TimeUnit.SECONDS),
             VirgilAccessTokenSigner(this.virgilCrypto)
         )
         val provider = CachingJwtProvider(CachingJwtProvider.RenewJwtCallback {
             jwtGenerator.generateToken(identity)
         })
-        var keyknoxManager = KeyknoxManager(KeyknoxClient(provider))
+        val serviceBaseUrl = this.propertyManager.getServiceBaseUrl()
+        var keyknoxManager = if (serviceBaseUrl.isNullOrBlank()) {
+            KeyknoxManager(KeyknoxClient(provider))
+        } else {
+            KeyknoxManager(KeyknoxClient(provider, URL(serviceBaseUrl)))
+        }
 
         val keyStorage =
             DefaultKeyStorage(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString())
@@ -606,7 +625,11 @@ class SyncKeyStorageTests {
         }
 
         // Reinit syncKeyStorage2
-        keyknoxManager = KeyknoxManager(KeyknoxClient(provider))
+        keyknoxManager = if (serviceBaseUrl.isNullOrBlank()) {
+            KeyknoxManager(KeyknoxClient(provider))
+        } else {
+            KeyknoxManager(KeyknoxClient(provider, URL(serviceBaseUrl)))
+        }
         syncKeyStorage2 = SyncKeyStorage(
             identity = this.identity,
             keyStorage = keyStorage,

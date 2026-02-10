@@ -31,7 +31,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-buildscript { 
+buildscript {
 
     ext.versions = [
 
@@ -63,7 +63,7 @@ buildscript {
             jsonsimple        : '1.5.1',
             mockito           : '3.0.0',
             mockitoJunit      : '3.0.0',
-            mannodermaus      : '1.5.0.0',
+            mannodermaus      : '1.7.1.1',
             mannodermausJunit5: '1.1.0',
 
             // Android Tests
@@ -180,6 +180,9 @@ subprojects {
 
         test {
             useJUnitPlatform()
+            if (System.getProperty('environment') != null) {
+                systemProperty 'environment', System.getProperty('environment')
+            }
             testLogging {
                 events "passed", "skipped", "failed"
             }
