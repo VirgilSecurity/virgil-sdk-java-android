@@ -1,0 +1,134 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-rc*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (for example v7.3.2)"
+        required: true
+        type: string
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Verify SDK version matches tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+
+          TAG_VERSION="${TAG#v}"
+          SDK_VERSION=$(grep -E "final String SDK_VERSION = '[^']+'" build.gradle | sed -E "s/.*'([^']+)'.*/\1/" | tr -d '[:space:]')
+          SDK_VERSION_BASE="${SDK_VERSION%-SNAPSHOT}"
+
+          echo "Tag version: ${TAG_VERSION}"
+          echo "SDK version: ${SDK_VERSION_BASE}"
+
+          if [ -z "${SDK_VERSION_BASE}" ]; then
+            echo "ERROR: Could not extract SDK_VERSION from build.gradle"
+            exit 1
+          fi
+
+          if [ "${TAG_VERSION}" != "${SDK_VERSION_BASE}" ]; then
+            echo "ERROR: Tag version (${TAG_VERSION}) doesn't match SDK version (${SDK_VERSION_BASE})"
+            exit 1
+          fi
+
+  build:
+    name: Build and Test
+    needs: verify-version
+    uses: ./.github/workflows/build-and-test.yml
+    secrets: inherit
+
+  publish-jvm:
+    name: Publish JVM artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Publish JVM artifacts
+        env:
+          ORG_GRADLE_PROJECT_authentication_username: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          ORG_GRADLE_PROJECT_authentication_password: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.CENTRAL_SONATYPE_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.CENTRAL_SONATYPE_SIGNING_PASSWORD }}
+        run: |
+          ./gradlew \
+            :api:publishMavenJavaPublicationToMavenRepository \
+            :common:publishMavenJavaPublicationToMavenRepository \
+            :crypto:publishMavenJavaPublicationToMavenRepository \
+            :test-common:publishMavenJavaPublicationToMavenRepository \
+            :sdk:publishMavenJavaPublicationToMavenRepository \
+            --no-daemon \
+            --stacktrace
+
+  publish-android:
+    name: Publish Android artifacts
+    needs: publish-jvm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          yes | sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Publish Android artifacts
+        env:
+          ORG_GRADLE_PROJECT_authentication_username: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          ORG_GRADLE_PROJECT_authentication_password: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.CENTRAL_SONATYPE_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.CENTRAL_SONATYPE_SIGNING_PASSWORD }}
+        run: |
+          ./gradlew \
+            :crypto-android:publishMavenJavaPublicationToMavenRepository \
+            :android-utils:publishMavenJavaPublicationToMavenRepository \
+            :sdk-android:publishMavenJavaPublicationToMavenRepository \
+            --no-daemon \
+            --stacktrace
