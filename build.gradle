@@ -165,8 +165,6 @@ subprojects {
     if (!isAndroid) {
         apply plugin: 'java-library'
 
-        sourceCompatibility = JavaVersion.VERSION_1_8
-
         dependencies {
             testImplementation "org.junit.jupiter:junit-jupiter:$versions.junit"
         }
@@ -179,6 +177,10 @@ subprojects {
             testLogging {
                 events "passed", "skipped", "failed"
             }
+        }
+
+        tasks.withType(JavaCompile).configureEach {
+            options.release.set(8)
         }
     }
 

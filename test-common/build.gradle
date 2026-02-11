@@ -46,7 +46,9 @@ dependencies {
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$versions.junit"
 }
 
-sourceCompatibility = 1.8
+tasks.withType(JavaCompile).configureEach {
+    options.release.set(8)
+}
 
 compileKotlin {
     kotlinOptions.jvmTarget = "1.8"
