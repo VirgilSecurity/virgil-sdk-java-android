@@ -26,15 +26,20 @@ In case you need additional security functionality for multi-device support, gro
 
 The Virgil Core SDK is provided as set of packages named *com.virgilsecurity.sdk*. Packages are distributed via Maven repository. In this guide you'll also find one more package - Virgil Crypto Library, that is used by the SDK to perform cryptographic operations.
 
-### Target
+### Runtime targets
 
-* Java 7+.
-* Android API 16+.
+* JVM artifacts target Java 8 bytecode.
+* Android artifacts target:
+  * `sdk-android`: minSdk 21, targetSdk 34.
+  * `crypto-android`: minSdk 21, targetSdk 34.
+  * `android-utils`: minSdk 23, targetSdk 34.
 
-### Prerequisites
+### Build prerequisites
 
-* Java Development Kit (JDK) 7+
-* Maven 3+
+* JDK 17 (required by Android Gradle Plugin 8.5.x).
+* Android SDK Platform 34 (for Android modules/tests).
+* Android emulator or device (for instrumentation tests).
+* Gradle Wrapper (already included in this repository).
 
 ### Installing the package
 
@@ -56,11 +61,11 @@ Use this packages for Java projects:
 
 #### Gradle
 
-Add jcenter() repository if missing:
+Add Maven Central if missing:
 
 ```
 repositories {
-    jcenter()
+    mavenCentral()
 }
 ```
 
@@ -71,6 +76,62 @@ Use this packages for Android projects:
 ```
 
 The **\<latest-version>** of the SDK can be found in the [Maven Central Repository](https://mvnrepository.com/artifact/com.virgilsecurity.sdk/sdk) or in the header of current readme.
+
+## Build and Test
+
+### Local setup
+
+Create `local.properties` in the project root if Android SDK is not auto-detected:
+
+```
+sdk.dir=/Users/<you>/Library/Android/sdk
+```
+
+For integration tests that hit Virgil services, keep `env.json` in the project root:
+
+* `env.json` is ignored by git.
+* `env.json.enc` can be stored in git and decrypted in CI.
+
+Encrypt/decrypt commands:
+
+```
+ENV_JSON_PASSPHRASE='<your-passphrase>' ./scripts/encrypt-env.sh
+ENV_JSON_PASSPHRASE='<your-passphrase>' ./scripts/decrypt-env.sh
+```
+
+### Build all modules
+
+```
+./gradlew clean build --no-daemon
+```
+
+### Run JVM tests
+
+Default environment is `pro`:
+
+```
+./gradlew :sdk:test --no-daemon --stacktrace
+```
+
+Use staging environment explicitly:
+
+```
+./gradlew :sdk:test -Denvironment=stg --no-daemon --stacktrace
+```
+
+### Run Android unit tests
+
+```
+./gradlew :crypto-android:testReleaseUnitTest :sdk-android:testReleaseUnitTest --no-daemon
+```
+
+### Run Android instrumentation tests
+
+Start an emulator (or connect a device), then run:
+
+```
+./gradlew :crypto-android:connectedReleaseAndroidTest :sdk-android:connectedReleaseAndroidTest --no-daemon --stacktrace
+```
 
 ## Configure SDK
 
@@ -352,4 +413,3 @@ Our developer support team is here to help you. Find out more information on our
 You can find us on [Twitter](https://twitter.com/VirgilSecurity) or send us email support@VirgilSecurity.com.
 
 Also, get extra help from our support team on [Slack](https://virgilsecurity.com/join-community).
-
