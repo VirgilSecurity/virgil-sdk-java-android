@@ -32,25 +32,33 @@
  */
 
 apply plugin: 'com.android.library'
-apply plugin: 'digital.wup.android-maven-publish'
 
 android {
-    compileSdkVersion 28
+    namespace "com.virgilsecurity.sdk.sdk"
+    compileSdk 34
 
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 28
+        minSdk 21
+        targetSdk 34
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
 
-        compileOptions {
-            sourceCompatibility JavaVersion.VERSION_1_8
-            targetCompatibility JavaVersion.VERSION_1_8
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    packaging {
+        resources {
+            excludes += ["META-INF/LICENSE*"]
         }
+    }
 
-        packagingOptions {
-            exclude "META-INF/LICENSE*"
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
         }
     }
 }
@@ -72,28 +80,12 @@ dependencies {
     androidTestImplementation "org.apache.commons:commons-lang3:$versions.commonsLang"
 }
 
-task androidJavadocs(type: Javadoc) {
-    source = android.sourceSets.main.java.srcDirs
-    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
-    exclude '**/R.html', '**/R.*.html', '**/index.html'
-}
-
-task androidJavadocsJar(type: Jar, dependsOn: androidJavadocs) {
-    archiveClassifier = 'javadoc'
-    from androidJavadocs.destinationDir
-}
-
-task androidSourcesJar(type: Jar) {
-    archiveClassifier = 'sources'
-    from android.sourceSets.main.java.srcDirs
-}
-
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            from components.android
-            artifact androidJavadocsJar
-            artifact androidSourcesJar
+            afterEvaluate {
+                from components.release
+            }
 
             pom {
                 name = 'Virgil SDK for Android'

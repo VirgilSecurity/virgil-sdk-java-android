@@ -43,7 +43,7 @@ dependencies {
 
     // Tests
     testImplementation "org.junit.jupiter:junit-jupiter-api:$versions.junit"
-    testRuntime "org.junit.jupiter:junit-jupiter-engine:$versions.junit"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:$versions.junit"
 }
 
 sourceCompatibility = 1.8
