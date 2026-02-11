@@ -88,10 +88,9 @@ public class VirgilCardClient implements CardClient {
    *
    * @param serviceUrl the service url to fire requests to
    */
-  public VirgilCardClient(String baseServiceUrl) {
+  public VirgilCardClient(String serviceUrl) {
     try {
-      URL url = new URL(baseServiceUrl);
-      this.serviceUrl = new URL(url.getProtocol(), url.getHost(), url.getPort(), CARDS_V5_PATH);
+      this.serviceUrl = resolveServiceUrl(new URL(serviceUrl));
       httpClient = new HttpClient();
     } catch (MalformedURLException e) {
       LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
@@ -107,8 +106,7 @@ public class VirgilCardClient implements CardClient {
    */
   public VirgilCardClient(String serviceUrl, HttpClient httpClient) {
     try {
-      URL url = new URL(serviceUrl);
-      this.serviceUrl = new URL(url.getProtocol(), url.getHost(), url.getPort(), CARDS_V5_PATH);
+      this.serviceUrl = resolveServiceUrl(new URL(serviceUrl));
     } catch (MalformedURLException e) {
       LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
       throw new IllegalArgumentException("Incorrect service URL", e);
@@ -121,9 +119,9 @@ public class VirgilCardClient implements CardClient {
    *
    * @param serviceUrl the service url to fire requests to
    */
-  public VirgilCardClient(URL baseServiceUrl) {
+  public VirgilCardClient(URL serviceUrl) {
     try {
-      this.serviceUrl = new URL(baseServiceUrl.getProtocol(), baseServiceUrl.getHost(), baseServiceUrl.getPort(), CARDS_V5_PATH);
+      this.serviceUrl = resolveServiceUrl(serviceUrl);
     } catch (MalformedURLException e) {
       LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
       throw new IllegalArgumentException("Incorrect service URL", e);
@@ -139,12 +137,16 @@ public class VirgilCardClient implements CardClient {
    */
   public VirgilCardClient(URL serviceUrl, HttpClient httpClient) {
     try {
-      this.serviceUrl = new URL(serviceUrl.getProtocol(), serviceUrl.getHost(), serviceUrl.getPort(), CARDS_V5_PATH);
+      this.serviceUrl = resolveServiceUrl(serviceUrl);
     } catch (MalformedURLException e) {
       LOGGER.log(Level.SEVERE, "Some issue occurred during service URL creating", e);
       throw new IllegalArgumentException("Incorrect service URL", e);
     }
     this.httpClient = httpClient;
+  }
+
+  private static URL resolveServiceUrl(URL serviceUrl) throws MalformedURLException {
+    return new URL(serviceUrl.getProtocol(), serviceUrl.getHost(), serviceUrl.getPort(), CARDS_V5_PATH);
   }
 
   /**
