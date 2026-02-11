@@ -70,6 +70,9 @@ task generateVirgilInfo(type: Copy) {
 
 compileKotlin.dependsOn(generateVirgilInfo)
 compileJava.dependsOn(generateVirgilInfo)
+tasks.matching { it.name == "sourcesJar" }.configureEach {
+    dependsOn(generateVirgilInfo)
+}
 
 publishing {
     publications {
