@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## 7.4.0-rc5 - 2026-02-12
+## 7.4.0 - 2026-02-12
 
 ### Added
 - Added GitHub Actions CI workflow `.github/workflows/build-and-test.yml` for JVM and Android build/test coverage.
