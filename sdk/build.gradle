@@ -57,19 +57,24 @@ dependencies {
     testImplementation "com.virgilsecurity.crypto:foundation:$versions.virgilCrypto"
 }
 
-sourceSets.main.java.srcDirs = ["${buildDir}/generated/", "src/main/java"]
+def virgilGeneratedSourcesDir = "${buildDir}/generated/virgil-info"
+
+sourceSets.main.java.srcDirs = [virgilGeneratedSourcesDir, "src/main/java"]
 
 task generateVirgilInfo(type: Copy) {
     from('src/main/templates') {
         include '**/*.java'
     }
-    into "$buildDir/generated"
+    into virgilGeneratedSourcesDir
     expand(version: "$project.version")
     includeEmptyDirs = false
 }
 
 compileKotlin.dependsOn(generateVirgilInfo)
 compileJava.dependsOn(generateVirgilInfo)
+tasks.matching { it.name == "sourcesJar" }.configureEach {
+    dependsOn(generateVirgilInfo)
+}
 
 publishing {
     publications {

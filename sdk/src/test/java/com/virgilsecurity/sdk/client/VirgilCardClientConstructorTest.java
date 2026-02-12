@@ -31,67 +31,39 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-apply plugin: 'com.android.library'
+package com.virgilsecurity.sdk.client;
 
-android {
-    namespace "com.virgilsecurity.sdk.androidutils"
-    compileSdk 34
+import org.junit.jupiter.api.Test;
 
-    defaultConfig {
-        minSdk 23
-        targetSdk 34
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+public class VirgilCardClientConstructorTest {
 
-        consumerProguardFiles 'proguard-rules.txt'
-    }
+  @Test
+  public void shouldAppendCardsPathForBaseUrl() {
+    VirgilCardClient cardClient = new VirgilCardClient("https://api.virgilsecurity.com");
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
+    assertEquals("https://api.virgilsecurity.com/card/v5/", cardClient.getServiceUrl().toString());
+  }
 
-    packaging {
-        resources {
-            excludes += ["META-INF/LICENSE*"]
-        }
-    }
+  @Test
+  public void shouldNormalizeCardsPathWithoutTrailingSlash() {
+    VirgilCardClient cardClient = new VirgilCardClient("https://api.virgilsecurity.com/card/v5");
 
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-        }
-    }
-}
+    assertEquals("https://api.virgilsecurity.com/card/v5/", cardClient.getServiceUrl().toString());
+  }
 
-dependencies {
-    // Internal dependencies
-    api project(":api")
-    implementation project(":crypto-android")
-    api project(":common")
+  @Test
+  public void shouldKeepCardsPathWithTrailingSlash() {
+    VirgilCardClient cardClient = new VirgilCardClient("https://api.virgilsecurity.com/card/v5/");
 
-    // Support
-    implementation "com.android.support:appcompat-v7:$versions.appCompat"
+    assertEquals("https://api.virgilsecurity.com/card/v5/", cardClient.getServiceUrl().toString());
+  }
 
-    // Gson
-    implementation "com.google.code.gson:gson:$versions.gson"
+  @Test
+  public void shouldKeepCustomPathUntouched() {
+    VirgilCardClient cardClient = new VirgilCardClient("https://localhost:9443/custom/cards/");
 
-    // Tests
-    testImplementation "junit:junit:$versions.junitAndroid"
-    androidTestImplementation "com.android.support.test:runner:$versions.testsRunner"
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            afterEvaluate {
-                from components.release
-            }
-
-            pom {
-                name = 'Virgil Android Utils'
-            }
-            artifactId = "android-utils"
-        }
-    }
+    assertEquals("https://localhost:9443/card/v5/", cardClient.getServiceUrl().toString());
+  }
 }

@@ -32,4 +32,28 @@
  */
 
 rootProject.name = 'Virgil SDK'
-include ':api', ':sdk', ':crypto', ':crypto-android', ':android-utils', 'examples', 'common', 'test-common', 'sdk-android'
+
+include ':api', ':sdk', ':crypto', 'examples', 'common', 'test-common'
+
+def hasAndroidSdk = {
+	def envSdkRoot = System.getenv('ANDROID_SDK_ROOT') ?: System.getenv('ANDROID_HOME')
+	if (envSdkRoot != null && !envSdkRoot.trim().isEmpty()) {
+		return true
+	}
+
+	def localProperties = file('local.properties')
+	if (!localProperties.exists()) {
+		return false
+	}
+
+	def props = new Properties()
+	localProperties.withInputStream { props.load(it) }
+	def sdkDir = props.getProperty('sdk.dir')
+	return sdkDir != null && !sdkDir.trim().isEmpty()
+}
+
+if (hasAndroidSdk()) {
+	include ':crypto-android', ':android-utils', ':sdk-android'
+} else {
+	println 'Android SDK not configured (set ANDROID_SDK_ROOT/ANDROID_HOME or local.properties sdk.dir); skipping Android subprojects.'
+}

@@ -1,0 +1,212 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-rc*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (for example v7.3.2)"
+        required: true
+        type: string
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Verify SDK version matches tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+
+          TAG_VERSION="${TAG#v}"
+          SDK_VERSION=$(grep -E "final String SDK_VERSION = '[^']+'" build.gradle | sed -E "s/.*'([^']+)'.*/\1/" | tr -d '[:space:]')
+          SDK_VERSION_BASE="${SDK_VERSION%-SNAPSHOT}"
+
+          echo "Tag version: ${TAG_VERSION}"
+          echo "SDK version: ${SDK_VERSION_BASE}"
+
+          if [ -z "${SDK_VERSION_BASE}" ]; then
+            echo "ERROR: Could not extract SDK_VERSION from build.gradle"
+            exit 1
+          fi
+
+          if [ "${TAG_VERSION}" != "${SDK_VERSION_BASE}" ]; then
+            echo "ERROR: Tag version (${TAG_VERSION}) doesn't match SDK version (${SDK_VERSION_BASE})"
+            exit 1
+          fi
+
+  build:
+    name: Build and Test
+    needs: verify-version
+    uses: ./.github/workflows/build-and-test.yml
+    secrets: inherit
+
+  publish:
+    name: Publish Artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          yes | sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Verify Central bundle publish tasks exist
+        run: |
+          ./gradlew -q help --task :api:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :common:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :crypto:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :test-common:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :sdk:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :crypto-android:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :android-utils:publishMavenJavaPublicationToCentralBundleRepository
+          ./gradlew -q help --task :sdk-android:publishMavenJavaPublicationToCentralBundleRepository
+
+      - name: Publish artifacts to local bundle repo
+        env:
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.CENTRAL_SONATYPE_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.CENTRAL_SONATYPE_SIGNING_PASSWORD }}
+        run: |
+          rm -rf build/central-bundle-repo build/central-bundle.zip
+          ./gradlew \
+            :api:publishMavenJavaPublicationToCentralBundleRepository \
+            :common:publishMavenJavaPublicationToCentralBundleRepository \
+            :crypto:publishMavenJavaPublicationToCentralBundleRepository \
+            :test-common:publishMavenJavaPublicationToCentralBundleRepository \
+            :sdk:publishMavenJavaPublicationToCentralBundleRepository \
+            :crypto-android:publishMavenJavaPublicationToCentralBundleRepository \
+            :android-utils:publishMavenJavaPublicationToCentralBundleRepository \
+            :sdk-android:publishMavenJavaPublicationToCentralBundleRepository \
+            --no-daemon \
+            --stacktrace
+
+      - name: Validate bundle repo contains POMs
+        run: |
+          test -d build/central-bundle-repo
+          POM_COUNT=$(find build/central-bundle-repo -type f -name '*.pom' | wc -l | tr -d '[:space:]')
+          echo "POM count: ${POM_COUNT}"
+          if [ "${POM_COUNT}" = "0" ]; then
+            echo "ERROR: No .pom files found in build/central-bundle-repo"
+            find build/central-bundle-repo -maxdepth 6 -type f | head -n 200
+            exit 1
+          fi
+
+      - name: Build Central bundle zip
+        run: |
+          test -d build/central-bundle-repo
+
+          # Central bundle should not include repository metadata/module metadata.
+          find build/central-bundle-repo -type f -name 'maven-metadata.xml*' -delete
+          find build/central-bundle-repo -type f -name '*.module*' -delete
+
+          while IFS= read -r -d '' file; do
+            md5sum "$file" | awk '{print $1}' > "$file.md5"
+            sha1sum "$file" | awk '{print $1}' > "$file.sha1"
+          done < <(find build/central-bundle-repo -type f \
+            ! -name '*.asc' \
+            ! -name '*.md5' \
+            ! -name '*.sha1' \
+            -print0)
+
+          (cd build/central-bundle-repo && zip -q -r ../central-bundle.zip .)
+          ls -la build/central-bundle.zip
+
+      - name: Upload Central bundle (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: central-portal-bundle
+          path: build/central-bundle.zip
+
+      - name: Upload Central bundle repo (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: central-portal-bundle-repo
+          path: build/central-bundle-repo/
+
+      - name: Upload bundle to Sonatype Central Portal
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+        run: |
+          if [ -z "${CENTRAL_USERNAME}" ] || [ -z "${CENTRAL_PASSWORD}" ]; then
+            echo "ERROR: Missing Central token credentials"
+            exit 1
+          fi
+
+          CENTRAL_BEARER=$(printf "%s:%s" "${CENTRAL_USERNAME}" "${CENTRAL_PASSWORD}" | base64 | tr -d '\n')
+          DEPLOYMENT_ID=$(curl -sS \
+            --fail \
+            --header "Authorization: Bearer ${CENTRAL_BEARER}" \
+            --form "bundle=@build/central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC&name=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}")
+
+          if [ -z "${DEPLOYMENT_ID}" ]; then
+            echo "ERROR: Central Portal did not return deployment ID"
+            exit 1
+          fi
+          echo "Central deployment id: ${DEPLOYMENT_ID}"
+          echo "DEPLOYMENT_ID=${DEPLOYMENT_ID}" >> "$GITHUB_ENV"
+
+      - name: Wait for Central Portal publish
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_SONATYPE_TOKEN_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_SONATYPE_TOKEN_PASSWORD }}
+        run: |
+          CENTRAL_BEARER=$(printf "%s:%s" "${CENTRAL_USERNAME}" "${CENTRAL_PASSWORD}" | base64 | tr -d '\n')
+
+          for i in $(seq 1 60); do
+            STATUS_JSON=$(curl -sS --fail --request POST \
+              --header "Authorization: Bearer ${CENTRAL_BEARER}" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=${DEPLOYMENT_ID}")
+            STATE=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("deploymentState",""))' <<<"${STATUS_JSON}")
+            echo "Central state: ${STATE}"
+
+            if [ "${STATE}" = "PUBLISHED" ]; then
+              exit 0
+            fi
+            if [ "${STATE}" = "FAILED" ]; then
+              echo "Central deployment FAILED"
+              echo "${STATUS_JSON}"
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+          echo "Timed out waiting for Central Portal publish"
+          exit 1
