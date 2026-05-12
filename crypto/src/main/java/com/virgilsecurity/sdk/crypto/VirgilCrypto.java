@@ -301,8 +301,7 @@ public class VirgilCrypto {
   public VirgilKeyPair generateKeyPair(KeyPairType keyPairType, byte[] seed) throws CryptoException {
     try (KeyMaterialRng keyMaterialRng = new KeyMaterialRng()) {
 
-      if (!(seed.length >= keyMaterialRng.getKeyMaterialLenMin()
-          && seed.length <= keyMaterialRng.getKeyMaterialLenMax())) {
+      if (!(seed.length >= 32 && seed.length <= 512)) {
         throw new CryptoException("Invalid seed size");
       }
 
